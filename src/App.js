@@ -84,16 +84,18 @@ const Transition = React.forwardRef(({
 		]),
 	]
 
-	return React.cloneElement(
-		children,
-		{
-			ref,
-			style: {
-				...computedStyles,
-				willChange: distinct.join(", "),
-				transition: distinct.map(v => `${v} ${computedDurMS}ms ${computedFunc} 0ms`).join(", "),
-			},
-		}
+	return (
+		React.cloneElement(
+			children,
+			{
+				ref,
+				style: {
+					...computedStyles,
+					willChange: distinct.join(", "),
+					transition: distinct.map(v => `${v} ${computedDurMS}ms ${computedFunc} 0ms`).join(", "),
+				},
+			}
+		)
 	)
 })
 
@@ -131,8 +133,9 @@ export default function App() {
 						scale: 1,
 						durMS: 300,
 					}}
-					func="cubic-bezier(0, 0.75, 0.25, 1.1)"
+					func="cubic-bezier(0, 0.75, 0.25, 1.1)" // TODO: Support [0, 0.75, 0.25, 1.1]?
 				>
+					{/* TODO: Support {open && ( ... )} syntax */}
 					<div className="modal center">
 						<h1>I love you! ❤</h1>
 					</div>

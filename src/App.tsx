@@ -1,19 +1,29 @@
+import * as React from "react"
+
 import "./App.scss"
 
 ////////////////////////////////////////////////////////////////////////////////
 
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? React.useEffect : React.useLayoutEffect
 
-function truthy(v) {
+function truthy(v: unknown): boolean {
 	return !!v
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
+interface Direction {
+	durMS?: number
+	func?: string
+	x?: number | string,
+	y?: number | string,
+	scale?: number,
+}
+
 // buildStyleObject builds a style object from a directional object. Properties
 // such as 'x', 'y', and 'scale' are transformed to a 'transform' string.
 // Transforms concatenate 'translateZ(0)'.
-function buildStyleObject(dir) {
+function buildStyleObject(dir: Direction): Record<string, number | string> {
 	const {
 		durMS: _1, // No-op
 		func: _2,  // No-op
@@ -23,7 +33,7 @@ function buildStyleObject(dir) {
 		...rest
 	} = dir
 
-	const out = { ...rest }
+	const out = rest as Record<string, number | string>
 	if (x !== undefined || y !== undefined || scale !== undefined) {
 		let transformStr = ""
 		if (x !== undefined) {
@@ -41,12 +51,17 @@ function buildStyleObject(dir) {
 		transformStr += " "
 		transformStr += `translateZ(0)`
 
-		out.transform = transformStr
+		out["transform"] = transformStr
 	}
 	return out
 }
 
-function aliases(arr) {
+function kebabCase(str: string): string {
+	return str.replace(/([A-Z])/g, (_, $1: string, x: number) =>
+		(x === 0 ? "" : "-") + $1.toLowerCase())
+}
+
+function aliases(arr: string[]): string[] {
 	const out = arr.map(v => {
 		switch (v) {
 			case "durMS": // No-op
@@ -57,12 +72,17 @@ function aliases(arr) {
 			case "scale":
 				return "transform"
 		}
-		// Convert to kebab-case
-		return v.replace(/([A-Z])/g, (_, $1, x) => {
-			return (x === 0 ? "" : "-") + $1.toLowerCase()
-		})
+		return kebabCase(v)
 	})
 	return out.filter(v => v !== undefined)
+}
+
+interface TransitionProps {
+	from: Record<string, number | string>,
+	to: Record<string, number | string>,
+	durMS?: number,
+	func?: string,
+	children?: React.ReactChildren
 }
 
 // Usage:
@@ -97,55 +117,43 @@ function aliases(arr) {
 //   )}
 // </Transition>
 //
-function Transition({
-	from,
-	to,
-	durMS,
-	func,
-	children,
-}) {
+function Transition({ from, to, durMS, func, children }: TransitionProps): JSX.Element {
 	const [computedStyles, setComputedStyles] = React.useState(buildStyleObject(from))
 	const [computedDurMS, setComputedDurMS] = React.useState(from.durMS ?? durMS ?? 300)
 	const [computedFunc, setComputedFunc] = React.useState(from.func ?? func ?? "ease-out")
 	const [computedChildren, setComputedChildren] = React.useState(children)
 
 	// Layout effect to compute 'computedChildren' from 'children'
-	useIsomorphicLayoutEffect(
-		React.useCallback(() => {
-			if (truthy(children)) {
-				setComputedChildren(children)
-				return
-			}
-			const timeoutID = setTimeout(() => {
-				setComputedChildren(children)
-			}, computedDurMS)
-			return () => {
-				clearTimeout(timeoutID)
-			}
-		}, [computedDurMS, children]),
-		[children],
-	)
+	useIsomorphicLayoutEffect(() => {
+		if (truthy(children)) {
+			setComputedChildren(children)
+			return
+		}
+		const timeoutID = setTimeout(() => {
+			setComputedChildren(children)
+		}, computedDurMS)
+		return () => {
+			clearTimeout(timeoutID)
+		}
+	}, [computedDurMS, children])
 
 	// Debounced effect to compute 'computedStyles', 'comptuedDurMS', and
 	// 'computedFunc'
-	React.useEffect(
-		React.useCallback(() => {
-			// Debounce by one frame
-			const timeoutID = setTimeout(() => {
-				let dir = from
-				if (truthy(children) && truthy(computedChildren)) {
-					dir = to
-				}
-				setComputedStyles(buildStyleObject(dir))
-				setComputedDurMS(dir.durMS ?? durMS ?? 300)
-				setComputedFunc(dir.func ?? func ?? "ease-out")
-			}, 16.67)
-			return () => {
-				clearTimeout(timeoutID)
+	React.useEffect(() => {
+		// Debounce by one frame
+		const timeoutID = setTimeout(() => {
+			let dir = from
+			if (truthy(children) && truthy(computedChildren)) {
+				dir = to
 			}
-		}, [from, to, durMS, func, children, computedChildren]),
-		[children, computedChildren],
-	)
+			setComputedStyles(buildStyleObject(dir))
+			setComputedDurMS(dir.durMS ?? durMS ?? 300)
+			setComputedFunc(dir.func ?? func ?? "ease-out")
+		}, 16.67)
+		return () => {
+			clearTimeout(timeoutID)
+		}
+	}, [from, to, durMS, func, children, computedChildren])
 
 	if (!truthy(computedChildren)) {
 		return null
@@ -168,7 +176,7 @@ function Transition({
 	})
 }
 
-export default function App() {
+export default function App(): JSX.Element {
 	const [open, setOpen] = React.useState(false)
 
 	return (
@@ -185,7 +193,7 @@ export default function App() {
 						opacity: 0,
 						y: -20,
 						scale: 0.75,
-						durMS: 500,
+						durMS: 600,
 					}}
 					to={{
 						boxShadow: `

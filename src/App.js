@@ -1,5 +1,18 @@
 import "./App.scss"
 
+////////////////////////////////////////////////////////////////////////////////
+
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? React.useEffect : React.useLayoutEffect
+
+function truthy(v) {
+	return !!v
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+// buildStyleObject builds a style object from a directional object. Properties
+// such as 'x', 'y', and 'scale' are transformed to a 'transform' string.
+// Transforms concatenate 'translateZ(0)'.
 function buildStyleObject(dir) {
 	const {
 		durMS: _1, // No-op
@@ -52,31 +65,93 @@ function aliases(arr) {
 	return out.filter(v => v !== undefined)
 }
 
-const Transition = React.forwardRef(({
-	on,
+// Usage:
+//
+// <Transition
+//   from={{
+//     boxShadow: `
+//       0 0 1px hsla(0, 0%, 0%, 0.25),
+//       0 0 transparent,
+//       0 0 transparent
+//     `,
+//     opacity: 0,
+//     y: -20,
+//     scale: 0.75,
+//     durMS: 1_000,
+//   }}
+//   to={{
+//     boxShadow: `
+//       0 0 1px hsla(0, 0%, 0%, 0.25),
+//       0 8px 8px hsla(0, 0%, 0%, 0.1),
+//       0 2px 8px hsla(0, 0%, 0%, 0.1)
+//     `,
+//     opacity: 1,
+//     y: 0,
+//     scale: 1,
+//     durMS: 300,
+//   }}
+//   func="cubic-bezier(0, 0.75, 0.25, 1.1)"
+// >
+//   {open && (
+//     // ...
+//   )}
+// </Transition>
+//
+function Transition({
 	from,
 	to,
 	durMS,
 	func,
 	children,
-}, ref) => {
-	if (!React.isValidElement(children)) {
-		throw new Error("!React.isValidElement(children)")
-	}
-
-	ref ??= children.ref
-
+}) {
 	const [computedStyles, setComputedStyles] = React.useState(buildStyleObject(from))
 	const [computedDurMS, setComputedDurMS] = React.useState(from.durMS ?? durMS ?? 300)
 	const [computedFunc, setComputedFunc] = React.useState(from.func ?? func ?? "ease-out")
+	const [computedChildren, setComputedChildren] = React.useState(children)
 
-	React.useEffect(() => {
-		const target = !on ? from : to
-		setComputedStyles(buildStyleObject(target))
-		setComputedDurMS(target.durMS ?? durMS ?? 300)
-		setComputedFunc(target.func ?? func ?? "ease-out")
-	}, [on, from, to, durMS, func])
+	// Layout effect to compute 'computedChildren' from 'children'
+	useIsomorphicLayoutEffect(
+		React.useCallback(() => {
+			if (truthy(children)) {
+				setComputedChildren(children)
+				return
+			}
+			const timeoutID = setTimeout(() => {
+				setComputedChildren(children)
+			}, computedDurMS)
+			return () => {
+				clearTimeout(timeoutID)
+			}
+		}, [computedDurMS, children]),
+		[children],
+	)
 
+	// Debounced effect to compute 'computedStyles', 'comptuedDurMS', and
+	// 'computedFunc'
+	React.useEffect(
+		React.useCallback(() => {
+			// Debounce by one frame
+			const timeoutID = setTimeout(() => {
+				let dir = from
+				if (truthy(children) && truthy(computedChildren)) {
+					dir = to
+				}
+				setComputedStyles(buildStyleObject(dir))
+				setComputedDurMS(dir.durMS ?? durMS ?? 300)
+				setComputedFunc(dir.func ?? func ?? "ease-out")
+			}, 16.67)
+			return () => {
+				clearTimeout(timeoutID)
+			}
+		}, [from, to, durMS, func, children, computedChildren]),
+		[children, computedChildren],
+	)
+
+	if (!truthy(computedChildren)) {
+		return null
+	}
+
+	// Compute on every truthy render
 	const distinct = [
 		...new Set([
 			...aliases(Object.keys(from)),
@@ -84,33 +159,23 @@ const Transition = React.forwardRef(({
 		]),
 	]
 
-	return (
-		React.cloneElement(
-			children,
-			{
-				ref,
-				style: {
-					...computedStyles,
-					willChange: distinct.join(", "),
-					transition: distinct.map(v => `${v} ${computedDurMS}ms ${computedFunc} 0ms`).join(", "),
-				},
-			}
-		)
-	)
-})
+	return React.cloneElement(computedChildren, {
+		style: {
+			...computedStyles,
+			willChange: distinct.join(", "),
+			transition: distinct.map(v => `${v} ${computedDurMS}ms ${computedFunc} 0ms`).join(", "),
+		},
+	})
+}
 
 export default function App() {
 	const [open, setOpen] = React.useState(false)
 
-	// const ref = React.useRef(null)
-
 	return (
 		<>
 			<button onClick={() => setOpen(!open)}>Press me</button>
-			<div className="center min-h-screen">
+			<div className="center">
 				<Transition
-					// ref={ref}
-					on={open}
 					from={{
 						boxShadow: `
 							0 0 1px hsla(0, 0%, 0%, 0.25),
@@ -120,7 +185,7 @@ export default function App() {
 						opacity: 0,
 						y: -20,
 						scale: 0.75,
-						durMS: 1_000,
+						durMS: 500,
 					}}
 					to={{
 						boxShadow: `
@@ -133,12 +198,13 @@ export default function App() {
 						scale: 1,
 						durMS: 300,
 					}}
-					func="cubic-bezier(0, 0.75, 0.25, 1.1)" // TODO: Support [0, 0.75, 0.25, 1.1]?
+					func="cubic-bezier(0, 0.75, 0.25, 1.1)"
 				>
-					{/* TODO: Support {open && ( ... )} syntax */}
-					<div className="modal center">
-						<h1>I love you! ❤</h1>
-					</div>
+					{open && (
+						<div className="modal center">
+							<h1>Hello, world!</h1>
+						</div>
+					)}
 				</Transition>
 			</div>
 		</>

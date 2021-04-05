@@ -82,6 +82,7 @@ interface TransitionProps {
 	to: Record<string, number | string>,
 	durMS?: number,
 	func?: string,
+	delayMS?: number,
 	children?: React.ReactChildren
 }
 
@@ -117,10 +118,11 @@ interface TransitionProps {
 //   )}
 // </Transition>
 //
-function Transition({ from, to, durMS, func, children }: TransitionProps): JSX.Element {
+function Transition({ from, to, durMS, func, delayMS, children }: TransitionProps): JSX.Element {
 	const [computedStyles, setComputedStyles] = React.useState(buildStyleObject(from))
 	const [computedDurMS, setComputedDurMS] = React.useState(from.durMS ?? durMS ?? 300)
 	const [computedFunc, setComputedFunc] = React.useState(from.func ?? func ?? "ease-out")
+	const [computedDelayMS, setComputedDelayMS] = React.useState(from.delayMS ?? delayMS ?? 0)
 	const [computedChildren, setComputedChildren] = React.useState(children)
 
 	// Layout effect to compute 'computedChildren' from 'children'
@@ -131,11 +133,11 @@ function Transition({ from, to, durMS, func, children }: TransitionProps): JSX.E
 		}
 		const timeoutID = setTimeout(() => {
 			setComputedChildren(children)
-		}, computedDurMS)
+		}, computedDelayMS + computedDurMS)
 		return () => {
 			clearTimeout(timeoutID)
 		}
-	}, [computedDurMS, children])
+	}, [(computedDelayMS + computedDurMS), children])
 
 	// Debounced effect to compute 'computedStyles', 'comptuedDurMS', and
 	// 'computedFunc'
@@ -149,11 +151,12 @@ function Transition({ from, to, durMS, func, children }: TransitionProps): JSX.E
 			setComputedStyles(buildStyleObject(dir))
 			setComputedDurMS(dir.durMS ?? durMS ?? 300)
 			setComputedFunc(dir.func ?? func ?? "ease-out")
+			setComputedDelayMS(dir.delayMS ?? delayMS ?? 0)
 		}, 16.67)
 		return () => {
 			clearTimeout(timeoutID)
 		}
-	}, [from, to, durMS, func, children, computedChildren])
+	}, [from, to, durMS, func, delayMS, children, computedChildren])
 
 	if (!truthy(computedChildren)) {
 		return null
@@ -171,7 +174,12 @@ function Transition({ from, to, durMS, func, children }: TransitionProps): JSX.E
 		style: {
 			...computedStyles,
 			willChange: distinct.join(", "),
-			transition: distinct.map(v => `${v} ${computedDurMS}ms ${computedFunc} 0ms`).join(", "),
+			transition: distinct.map(v => `
+				${v}
+				${computedDurMS}ms
+				${computedFunc}
+				${computedDelayMS}ms
+			`).join(", "),
 		},
 	})
 }
@@ -182,7 +190,7 @@ export default function App(): JSX.Element {
 	return (
 		<>
 			<button onClick={() => setOpen(!open)}>Press me</button>
-			<div className="center">
+			<div className="center min-h-screen">
 				<Transition
 					from={{
 						boxShadow: `
@@ -193,7 +201,8 @@ export default function App(): JSX.Element {
 						opacity: 0,
 						y: -20,
 						scale: 0.75,
-						durMS: 600,
+						durMS: 400,
+						// delayMS: 2_000,
 					}}
 					to={{
 						boxShadow: `
@@ -204,9 +213,11 @@ export default function App(): JSX.Element {
 						opacity: 1,
 						y: 0,
 						scale: 1,
-						durMS: 300,
+						durMS: 200,
+						// delayMS: 1_000,
 					}}
 					func="cubic-bezier(0, 0.75, 0.25, 1.1)"
+				// delayMS={1_000}
 				>
 					{open && (
 						<div className="modal center">

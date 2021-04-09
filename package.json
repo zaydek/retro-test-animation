@@ -10,8 +10,8 @@
 		"react-dom": "v17.0.2"
 	},
 	"devDependencies": {
-		"@zaydek/retro": "v0.0.35",
-		"esbuild": "v0.10.2",
+		"@zaydek/retro": "^0.0.41",
+		"esbuild": "^0.11.6",
 		"sass": "^1.32.8"
 	}
 }

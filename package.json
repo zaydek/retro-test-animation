@@ -5,7 +5,6 @@
 		"serve": "retro serve"
 	},
 	"dependencies": {
-		"framer-motion": "^4.1.2",
 		"react": "v17.0.2",
 		"react-dom": "v17.0.2"
 	},
